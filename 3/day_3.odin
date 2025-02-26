@@ -43,10 +43,14 @@ multiply :: proc(expression: string) -> (result: int) {
 execute :: proc(expression: string) -> (part1: int, part2: int) {
 	part1 = multiply(expression)
 
+	it := make_tokenizer_iterator(expression)
+	for val in tokenizer_iterator(&it) {
+    part2 += multiply(val)
+	}
+
 	return
 }
 
-// TODO is usage of string here resulting in copies?
 Tokenizer_Iterator :: struct {
 	data:  string,
 	index: int,
@@ -56,40 +60,28 @@ make_tokenizer_iterator :: proc(data: string) -> Tokenizer_Iterator {
 	return Tokenizer_Iterator{data = data}
 }
 
-tokenizer_iterator :: proc(it: ^Tokenizer_Iterator) -> (val: string, idx: int, cond: bool) {
-	fmt.println("iterating")
-	if index := strings.index(it.data[it.index:], "don't()"); index != -1 {
-		fmt.printfln("Found don't() at [%v]: %v", index, it.data[it.index + index:])
-		dont_end := it.index + index + len("don't()")
-		val = it.data[it.index:dont_end]
-		next_do_index := strings.index(it.data[dont_end:], "do()")
+tokenizer_iterator :: proc(it: ^Tokenizer_Iterator) -> (val: string, ignore: struct{}, cond: bool) {
+  if it.index >= len(it.data) {
+    return
+  }
+  dont_idx := strings.index(it.data[it.index:], "don't()")
+  if dont_idx == -1 {
+    val = it.data[it.index:]
+    it.index = len(it.data)
+    return val, {}, true
+  }
+  val = it.data[it.index:it.index + dont_idx + len("don't()")]
+  it.index += dont_idx + len("don't()")
 
-		if next_do_index == -1 {
-			fmt.println("No more do()s")
-			return val, 0, false
-		} else {
-			fmt.printfln(
-				"Found another do() at [%v]: %v",
-				next_do_index,
-				it.data[dont_end + next_do_index:],
-			)
-			it.index = dont_end + next_do_index + len("do()")
-			return val, 0, true
-		}
-	}
-	fmt.println("no don't()", it.index, it.data)
-	return it.data[it.index:], 0, false
+  do_idx := strings.index(it.data[it.index:], "do()")
+  it.index += do_idx + len("do()") if do_idx != -1 else len(it.data)
+  return val, {}, true
 }
 
 main :: proc() {
-	expression := read_input("example.txt")
+	expression := read_input("input.txt")
 	defer delete(expression)
 	part1, part2 := execute(expression)
 	fmt.println("Part1:", part1)
 	fmt.println("Part2:", part2)
-
-	it := make_tokenizer_iterator(expression)
-	for val in tokenizer_iterator(&it) {
-		fmt.println(val)
-	}
 }
