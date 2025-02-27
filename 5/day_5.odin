@@ -5,13 +5,35 @@ import "core:math"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import "core:testing"
 
 RuleSet :: map[string]struct {}
-Page :: struct {
-	// 75,47,61,53,29
-	data:  [dynamic]int,
-	// { 75: 0, 47: 1, 61: 2, 53: 3, 29: 4}
-	index: map[int]int,
+Page :: [dynamic]int
+
+destroy_rule_set :: proc(rule_set: RuleSet) {
+	for key in rule_set {
+		delete(key)
+	}
+	delete(rule_set)
+}
+
+destroy_pages :: proc(pages: [dynamic]Page) {
+	for page in pages {
+		delete(page)
+	}
+	delete(pages)
+}
+
+@(test)
+test :: proc(t: ^testing.T) {
+	rule_set, pages := read_input("example.txt")
+	defer {
+		destroy_rule_set(rule_set)
+		destroy_pages(pages)
+	}
+	part1, part2 := execute(rule_set, pages[:])
+	testing.expect_value(t, part1, 143)
+	testing.expect_value(t, part2, 123)
 }
 
 make_rule_set :: proc(rules_str: ^string) -> RuleSet {
@@ -28,11 +50,11 @@ make_pages :: proc(pages_str: ^string) -> (pages: [dynamic]Page) {
 	}
 	for page_str in strings.split_lines_iterator(pages_str) {
 		fields := strings.fields_proc(page_str, is_comma)
+		defer delete(fields)
 		page := Page{}
 		for num_str, i in fields {
 			num := strconv.atoi(num_str)
-			append(&page.data, num)
-			page.index[num] = i
+			append(&page, num)
 		}
 		append(&pages, page)
 	}
@@ -60,8 +82,8 @@ rule_key :: proc(nums: [2]int) -> string {
 }
 
 check_page :: proc(page: Page, rule_set: RuleSet) -> bool {
-	for num, i in page.data {
-		for anum in page.data[i + 1:] {
+	for num, i in page {
+		for anum in page[i + 1:] {
 			bad_rule := rule_key({anum, num})
 			if _, ok := rule_set[bad_rule]; ok {
 				return false
@@ -71,10 +93,28 @@ check_page :: proc(page: Page, rule_set: RuleSet) -> bool {
 	return true
 }
 
+reorder_page :: proc(page: Page, rule_set: RuleSet) {
+	outer: for num, i in page[:] {
+		for bnum, bi in page[:i + 1] {
+			rule := rule_key({num, bnum})
+			if _, ok := rule_set[rule]; ok {
+				copy(page[bi + 1:], page[bi:i])
+				page[bi] = num
+				continue outer
+			}
+		}
+	}
+}
+
 execute :: proc(rule_set: RuleSet, pages: []Page) -> (part1, part2: int) {
+	context.allocator = context.temp_allocator
+	defer free_all(context.temp_allocator)
 	for page in pages {
 		if check_page(page, rule_set) {
-			part1 += page.data[len(page.data) / 2]
+			part1 += page[len(page) / 2]
+		} else {
+			reorder_page(page, rule_set)
+			part2 += page[len(page) / 2]
 		}
 	}
 	return
@@ -84,4 +124,5 @@ main :: proc() {
 	rule_set, pages := read_input("input.txt")
 	part1, part2 := execute(rule_set, pages[:])
 	fmt.println("Part1:", part1)
+	fmt.println("Part2:", part2)
 }
