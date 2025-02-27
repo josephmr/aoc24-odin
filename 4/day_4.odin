@@ -3,7 +3,18 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:testing"
 import "core:unicode"
+
+@(test)
+test :: proc(t: ^testing.T) {
+	grid := read_input("example.txt")
+	defer destroy_grid(grid)
+
+	part1, part2 := execute(grid)
+	testing.expect_value(t, part1, 18)
+	testing.expect_value(t, part2, 9)
+}
 
 destroy_grid :: proc(grid: Grid) {
 	for arr in grid {
@@ -98,6 +109,7 @@ execute :: proc(grid: Grid) -> (part1: int, part2: int) {
 		for j := 0; j < len(grid[i]); j += 1 {
 			for dir in Direction {
 				word := get_word(grid, {i, j}, dir)
+				defer delete(word)
 				if strings.compare(word, "XMAS") == 0 {
 					part1 += 1
 				}
